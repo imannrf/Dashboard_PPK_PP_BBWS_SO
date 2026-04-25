@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Informasi PPK PP BBWS Serayu Opak</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
+    <style>
+        :root { --pu-blue: #003366; --pu-yellow: #ffcc00; --bg-color: #f4f7f6; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); display: flex; flex-direction: column; height: 100vh; }
+        
+        /* NAVBAR UTAMA */
+        .navbar { background-color: var(--pu-blue); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 2000; position: relative; }
+        .navbar-brand { font-size: 20px; font-weight: bold; color: var(--pu-yellow); }
+        .nav-menu { display: flex; gap: 20px; }
+        .nav-btn { background: none; border: none; color: white; font-size: 16px; cursor: pointer; padding: 8px 15px; border-radius: 5px; transition: 0.3s; }
+        .nav-btn:hover, .nav-btn.active { background-color: rgba(255, 255, 255, 0.2); color: var(--pu-yellow); }
+
+        /* PENGATURAN HALAMAN */
+        .page-section { display: none; flex-grow: 1; }
+        .page-section.active { display: flex; }
+
+        /* HALAMAN BERANDA */
+        #page-beranda { flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
+        .beranda-card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 800px; }
+        .beranda-card h1 { color: var(--pu-blue); margin-top: 0; }
+        .beranda-card p { font-size: 16px; color: #555; line-height: 1.6; }
+        .btn-mulai { background-color: var(--pu-yellow); color: var(--pu-blue); border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        .btn-mulai:hover { background-color: #e6b800; transform: translateY(-2px); }
+
+        /* HALAMAN DASHBOARD PETA */
+        #page-dashboard { display: none; height: 100%; width: 100%; position: relative; }
+        #page-dashboard.active { display: flex; }
+
+        /* SIDEBAR KIRI */
+        .sidebar { width: 360px; background: white; height: 100%; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; position: relative; }
+        .sidebar-header { padding: 15px; background: #eceff1; border-bottom: 1px solid #ddd; }
+        .search-box { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        .menu-container { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        
+        /* MENU AKORDEON */
+        .year-btn { background: var(--pu-blue); color: white; width: 100%; text-align: left; padding: 12px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+        .year-btn:hover { background: #004080; }
+        .package-list { display: none; padding: 5px 10px 15px 10px; }
+        
+        /* STYLE UNTUK TIPE PAKET (SWAKELOLA / KONTRAKTUAL) */
+        .tipe-header { font-size: 15px; color: #d35400; margin: 15px 0 8px 0; font-weight: bold; border-bottom: 2px solid #ddd; padding-bottom: 4px; text-transform: uppercase; }
+        
+        .item-paket { background: #f9f9f9; border-left: 4px solid var(--pu-yellow); padding: 10px; margin-bottom: 8px; border-radius: 4px; cursor: pointer; transition: 0.2s; font-size: 14px; }
+        .item-paket:hover { background: #eef2f5; transform: translateX(3px); }
+
+        /* PETA & POPUP */
+        #map { flex-grow: 1; height: 100%; z-index: 1; }
+        .custom-popup { max-width: 320px; }
+        .custom-popup h3 { margin: 0 0 8px 0; color: var(--pu-blue); font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+        .popup-content-text { font-size: 13px; color: #333; line-height: 1.5; margin: 0; }
+        .popup-item { margin-bottom: 6px; }
+        .foto-dokumentasi { width: 100%; border-radius: 4px; display: block; margin-top: 10px; cursor: zoom-in; transition: 0.2s; border: 1px solid #ddd; }
+        .foto-dokumentasi:hover { opacity: 0.8; }
+        
+        /* MODAL FOTO */
+        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); }
+        .modal-content { margin: auto; display: block; max-width: 90%; max-height: 90vh; margin-top: 2%; border-radius: 5px; }
+        .modal-caption { margin: auto; display: block; width: 80%; text-align: center; color: white; padding: 10px 0; font-size: 18px; }
+        .close-btn { position: absolute; top: 15px; right: 35px; color: #fff; font-size: 40px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .close-btn:hover { color: var(--pu-yellow); }
+
+        /* KOTAK KONTROL LAYER KUSTOM */
+        .custom-layer-box { background: white; padding: 10px; border-radius: 5px; box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-size: 14px; min-width: 220px; }
+        .layer-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #eee; }
+        .layer-row label { cursor: pointer; display: flex; align-items: center; gap: 8px; flex-grow: 1; }
+        .arrow-btns span { cursor: pointer; color: #777; font-size: 12px; background: #f0f0f0; padding: 2px 5px; border-radius: 3px; }
+        .arrow-btns span:hover { background: #ddd; color: #000; }
+    </style>
+</head>
+<body>
+
+<script src="data/dataWS1.js"></script>
+<script src="data/dataWS2.js"></script>
+<script src="data/dataDAS1.js"></script>
+<script src="data/dataDAS2.js"></script>
+
+<nav class="navbar">
+    <div class="navbar-brand">Sistem Informasi PPK PP BBWS Serayu Opak</div>
+    <div class="nav-menu">
+        <button class="nav-btn active" onclick="bukaHalaman('page-beranda', this)">Beranda</button>
+        <button class="nav-btn" onclick="bukaHalaman('page-dashboard', this)">Dashboard Peta</button>
+    </div>
+</nav>
+
+<div id="page-beranda" class="page-section active">
+    <div class="beranda-card">
+        <h1>Selamat Datang di Portal PPK PP BBWS Serayu Opak</h1>
+        <p>Sistem ini merupakan WebGIS sederhana untuk menginventarisasi dan memvisualisasikan secara spasial paket-paket pekerjaan yang ada di lingkungan PPK PP BBWS Serayu Opak.</p>
+        <button class="btn-mulai" onclick="document.querySelectorAll('.nav-btn')[1].click()">Buka Dashboard Peta &raquo;</button>
+    </div>
+</div>
+
+<div id="page-dashboard" class="page-section">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Cari nama paket atau lokasi..." onkeyup="filterMenu()">
+        </div>
+        <div class="menu-container" id="menu-container">
+            <div id="loading-text" style="text-align:center; padding:20px; color:#666;">Sedang memuat data paket dari CSV...</div>
+        </div>
+    </div>
+    <div id="map"></div>
+</div>
+
+<div id="fotoModal" class="modal">
+    <span class="close-btn" onclick="tutupModal()">&times;</span>
+    <img class="modal-content" id="imgModalRes">
+    <div id="captionModal" class="modal-caption"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // --- 1. INISIALISASI PETA & BASEMAP ---
+    const map = L.map('map', {zoomControl: false}).setView([-7.6, 109.8], 9);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri'
+    }).addTo(map);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    // --- 2. MEMBUAT LEAFLET PANES (Lapisan Transparan) ---
+    map.createPane('pane_ws');
+    map.createPane('pane_das');
+    map.createPane('pane_paket');
+    map.getPane('pane_paket').style.zIndex = 402;  
+    map.getPane('pane_das').style.zIndex = 401;    
+    map.getPane('pane_ws').style.zIndex = 400;     
+
+    // --- 3. KONFIGURASI GEOJSON WS & DAS ---
+    const styleWS = { color: "#003366", weight: 3, opacity: 0.8, fillColor: "#003366", fillOpacity: 0.1 };
+    const styleDAS = { color: "#d35400", weight: 2, dashArray: '5, 5', fillOpacity: 0.05 };
+
+    function popupAtribut(feature, layer, tipe) { 
+        let nama = (tipe === "WS") ? (feature.properties.WS || "Wilayah Sungai") : (feature.properties.NAMA_DAS || "DAS");
+        layer.bindPopup(`<b>${nama}</b>`); 
+    }
+
+    const geoWS1 = L.geoJSON(typeof dataWS1 !== 'undefined' ? dataWS1 : null, { style: styleWS, pane: 'pane_ws', onEachFeature: (f, l) => popupAtribut(f, l, "WS") });
+    const geoWS2 = L.geoJSON(typeof dataWS2 !== 'undefined' ? dataWS2 : null, { style: styleWS, pane: 'pane_ws', onEachFeature: (f, l) => popupAtribut(f, l, "WS") });
+    const geoDAS1 = L.geoJSON(typeof dataDAS1 !== 'undefined' ? dataDAS1 : null, { style: styleDAS, pane: 'pane_das', onEachFeature: (f, l) => popupAtribut(f, l, "DAS") });
+    const geoDAS2 = L.geoJSON(typeof dataDAS2 !== 'undefined' ? dataDAS2 : null, { style: styleDAS, pane: 'pane_das', onEachFeature: (f, l) => popupAtribut(f, l, "DAS") });
+
+    const layerGrupWS = L.featureGroup([geoWS1, geoWS2]).addTo(map);
+    const layerGrupDAS = L.featureGroup([geoDAS1, geoDAS2]).addTo(map);
+    const layerGrupPaket = L.featureGroup().addTo(map);
+
+    // --- 4. MEMBUAT KONTROL LAYER KUSTOM (Pojok Kanan Atas) ---
+    const CustomLayerControl = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: function (map) {
+            const div = L.DomUtil.create('div', 'custom-layer-box leaflet-bar leaflet-control');
+            L.DomEvent.disableClickPropagation(div);
+            div.innerHTML = `
+                <div class="layer-row" data-pane="pane_paket"><label><input type="checkbox" checked id="chk_paket"> Titik Paket Pekerjaan</label><div class="arrow-btns"><span onclick="geserLayer(this, 'up')">▲</span><span onclick="geserLayer(this, 'down')">▼</span></div></div>
+                <div class="layer-row" data-pane="pane_das"><label><input type="checkbox" checked id="chk_das"> Batas DAS</label><div class="arrow-btns"><span onclick="geserLayer(this, 'up')">▲</span><span onclick="geserLayer(this, 'down')">▼</span></div></div>
+                <div class="layer-row" data-pane="pane_ws"><label><input type="checkbox" checked id="chk_ws"> Batas Wilayah Sungai</label><div class="arrow-btns"><span onclick="geserLayer(this, 'up')">▲</span><span onclick="geserLayer(this, 'down')">▼</span></div></div>
+            `;
+            return div;
+        }
+    });
+    map.addControl(new CustomLayerControl());
+
+    document.getElementById('chk_paket').addEventListener('change', function() { this.checked ? map.addLayer(layerGrupPaket) : map.removeLayer(layerGrupPaket); });
+    document.getElementById('chk_das').addEventListener('change', function() { this.checked ? map.addLayer(layerGrupDAS) : map.removeLayer(layerGrupDAS); });
+    document.getElementById('chk_ws').addEventListener('change', function() { this.checked ? map.addLayer(layerGrupWS) : map.removeLayer(layerGrupWS); });
+
+    function geserLayer(btn, direction) {
+        const row = btn.closest('.layer-row');
+        if (direction === 'up' && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+        else if (direction === 'down' && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+        updatePaneZIndex();
+    }
+    function updatePaneZIndex() {
+        const rows = document.querySelectorAll('.layer-row');
+        let z = 405; 
+        rows.forEach(row => { map.getPane(row.getAttribute('data-pane')).style.zIndex = z; z--; });
+    }
+
+    // --- 5. LOGIKA BACA DATA CSV ---
+    const csvUrl = 'data/paket.csv'; 
+
+    Papa.parse(csvUrl, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            const data = results.data;
+            document.getElementById('loading-text').style.display = 'none';
+            bangunMenuDariCSV(data);
+        },
+        error: function(err) {
+            document.getElementById('loading-text').innerHTML = "<b style='color:red;'>Gagal memuat paket.csv. Pastikan web ini dibuka dari GitHub (bukan file lokal) dan file paket.csv ada di dalam folder data.</b>";
+        }
+    });
+
+    function bangunMenuDariCSV(databasePaket) {
+        const menuContainer = document.getElementById('menu-container');
+        const dataPerTahun = {}; 
+
+        // 1. Kelompokkan berdasarkan Tahun, lalu berdasarkan Tipe (Swakelola/Kontraktual/Kaji Cepat)
+        databasePaket.forEach(item => { 
+            // Cek properti dengan fleksibel untuk menghindari error huruf besar/kecil di CSV
+            let tahun = item.tahun || item.Tahun;
+            let tipe = item.tipe || item.Tipe || "Tanpa Kategori";
+            let judul = item.judul || item.Judul;
+            let lat = item.lat || item.Lat;
+            let lng = item.long || item.Long || item.lng || item.Lng;
+
+            if(tahun && judul && lat && lng) {
+                tahun = tahun.trim();
+                tipe = tipe.trim();
+                if (!dataPerTahun[tahun]) dataPerTahun[tahun] = {};
+                if (!dataPerTahun[tahun][tipe]) dataPerTahun[tahun][tipe] = [];
+                
+                dataPerTahun[tahun][tipe].push({ ...item, tahun, tipe, judul, lat, lng }); 
+            }
+        });
+
+        // Urutkan tahun (terbaru ke terlama)
+        const sortedTahun = Object.keys(dataPerTahun).sort((a,b) => b - a);
+
+        sortedTahun.forEach(tahun => {
+            // Hitung total paket di tahun tersebut
+            let totalPaketTahun = 0;
+            Object.values(dataPerTahun[tahun]).forEach(arr => totalPaketTahun += arr.length);
+
+            // Buat Tombol Tahun
+            const btnTahun = document.createElement('button');
+            btnTahun.className = 'year-btn';
+            btnTahun.innerText = `📁 Tahun ${tahun} (${totalPaketTahun} Paket)`;
+            
+            const listWadah = document.createElement('div');
+            listWadah.className = 'package-list';
+            btnTahun.onclick = () => { listWadah.style.display = listWadah.style.display === "block" ? "none" : "block"; };
+
+            // 2. Tampilkan Berdasarkan Tipe
+            const sortedTipe = Object.keys(dataPerTahun[tahun]).sort();
+            
+            sortedTipe.forEach(tipe => {
+                // Header Tipe (Contoh: "SWAKELOLA" atau "TIM KAJI CEPAT")
+                const tipeHeader = document.createElement('div');
+                tipeHeader.className = 'tipe-header';
+                tipeHeader.innerText = tipe;
+                listWadah.appendChild(tipeHeader);
+
+                // Daftar paket di bawah tipe tersebut
+                dataPerTahun[tahun][tipe].forEach(item => {
+                    let foto = item.foto || item.Foto;
+                    let lokasi = item.lokasi || item.Lokasi || '-';
+                    let deskripsi = item.deskripsi || item.Deskripsi || '-';
+                    let output = item.output || item.Output || '-';
+                    let outcome = item.outcome || item.Outcome || '-';
+
+                    let imgHTML = foto ? `<img src="${foto}" class="foto-dokumentasi" onclick="bukaModal('${foto}', '${item.judul}')" onerror="this.style.display='none'">` : '';
+                    let popupContent = `
+                        <div class="custom-popup">
+                            <h3>${item.judul}</h3>
+                            <div class="popup-content-text">
+                                <div class="popup-item"><b>Lokasi:</b> ${lokasi}</div>
+                                <div class="popup-item"><b>Deskripsi:</b> ${deskripsi}</div>
+                                <div class="popup-item"><b>Output:</b> ${output}</div>
+                                <div class="popup-item"><b>Outcome:</b> ${outcome}</div>
+                            </div>
+                            ${imgHTML}
+                        </div>
+                    `;
+                    
+                    const latNum = parseFloat(item.lat);
+                    const lngNum = parseFloat(item.lng);
+                    
+                    if(!isNaN(latNum) && !isNaN(lngNum)) {
+                        const marker = L.marker([latNum, lngNum], {pane: 'pane_paket'}).bindPopup(popupContent);
+                        layerGrupPaket.addLayer(marker);
+
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'item-paket';
+                        itemDiv.innerHTML = `<b>${item.judul}</b>`;
+                        itemDiv.onclick = () => { map.flyTo([latNum, lngNum], 15, {duration: 1.5}); setTimeout(() => { marker.openPopup(); }, 1500); };
+                        listWadah.appendChild(itemDiv);
+                    }
+                });
+            });
+
+            menuContainer.appendChild(btnTahun);
+            menuContainer.appendChild(listWadah);
+        });
+    }
+
+    // --- 6. FUNGSI NAVIGASI & SEARCH ---
+    function bukaHalaman(idHalaman, btnElement) {
+        document.querySelectorAll('.page-section').forEach(page => page.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(idHalaman).classList.add('active');
+        btnElement.classList.add('active');
+        if (idHalaman === 'page-dashboard') { setTimeout(() => map.invalidateSize(), 300); }
+    }
+
+    function filterMenu() {
+        let input = document.getElementById('searchInput').value.toLowerCase();
+        // Buka paksa semua wadah tahun jika sedang mencari
+        document.querySelectorAll('.package-list').forEach(list => list.style.display = input.length > 0 ? "block" : "none");
+        
+        document.querySelectorAll('.item-paket').forEach(item => { 
+            // Cek apakah judul paket atau header tipe-nya mengandung kata kunci
+            let isMatch = item.innerText.toLowerCase().includes(input);
+            item.style.display = isMatch ? "block" : "none"; 
+        });
+
+        // Sembunyikan header tipe jika tidak ada anak (item-paket) yang terlihat di bawahnya
+        document.querySelectorAll('.tipe-header').forEach(header => {
+            if(input.length === 0) {
+                header.style.display = "block";
+            } else {
+                let sibling = header.nextElementSibling;
+                let hasVisibleItem = false;
+                while(sibling && sibling.classList.contains('item-paket')) {
+                    if(sibling.style.display === "block") hasVisibleItem = true;
+                    sibling = sibling.nextElementSibling;
+                }
+                header.style.display = hasVisibleItem ? "block" : "none";
+            }
+        });
+    }
+
+    function bukaModal(srcImage, judulPaket) {
+        document.getElementById('fotoModal').style.display = "block";
+        document.getElementById('imgModalRes').src = srcImage;
+        document.getElementById('captionModal').innerText = judulPaket;
+    }
+    function tutupModal() { document.getElementById('fotoModal').style.display = "none"; }
+
+</script>
+</body>
+</html>
