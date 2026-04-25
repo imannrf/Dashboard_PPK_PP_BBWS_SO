@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Informasi PPK PP BBWS Serayu Opak</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
+    <style>
+        :root { --pu-blue: #003366; --pu-yellow: #ffcc00; --bg-color: #f4f7f6; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); display: flex; flex-direction: column; height: 100vh; }
+        
+        .navbar { background-color: var(--pu-blue); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 2000; }
+        .navbar-brand { font-size: 20px; font-weight: bold; color: var(--pu-yellow); }
+        .nav-menu { display: flex; gap: 20px; }
+        .nav-btn { background: none; border: none; color: white; font-size: 16px; cursor: pointer; padding: 8px 15px; border-radius: 5px; transition: 0.3s; }
+        .nav-btn.active { background-color: rgba(255, 255, 255, 0.2); color: var(--pu-yellow); }
+
+        .page-section { display: none; flex-grow: 1; }
+        .page-section.active { display: flex; }
+
+        #page-beranda { flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
+        .beranda-card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 800px; }
+        .btn-mulai { background-color: var(--pu-yellow); color: var(--pu-blue); border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+
+        /* SIDEBAR */
+        .sidebar { width: 360px; background: white; height: 100%; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; background: #003366; border-bottom: 3px solid #ffcc00; }
+        .search-box { width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 14px; outline: none; }
+
+        .menu-container { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        .year-btn { background: var(--pu-blue); color: white; width: 100%; text-align: left; padding: 12px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+        .package-list { display: none; padding: 5px 10px 15px 10px; }
+        
+        .tipe-header { font-size: 14px; color: #d35400; margin: 15px 0 8px 0; font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 4px; text-transform: uppercase; }
+        .item-paket { background: #f9f9f9; border-left: 4px solid var(--pu-yellow); padding: 12px; margin-bottom: 8px; border-radius: 4px; cursor: pointer; transition: 0.2s; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .item-paket:hover { background: #eef2f5; transform: translateX(5px); }
+
+        /* MAP & POPUP */
+        #map { flex-grow: 1; height: 100%; z-index: 1; }
+        .custom-popup { width: 280px; font-family: 'Segoe UI', sans-serif; }
+        .custom-popup h3 { margin: 0 0 10px 0; color: var(--pu-blue); font-size: 16px; border-bottom: 2px solid var(--pu-yellow); padding-bottom: 5px; }
+        .popup-info { font-size: 13px; line-height: 1.6; color: #333; margin-bottom: 10px; }
+        .popup-info b { color: var(--pu-blue); }
+        .foto-popup { width: 100%; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; margin-top: 5px; transition: 0.3s; }
+        .foto-popup:hover { opacity: 0.8; transform: scale(1.02); }
+
+        /* LAYER CONTROL */
+        .custom-layer-box { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 13px; min-width: 200px; border: 1px solid #ddd; }
+        .layer-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .layer-row:last-child { border-bottom: none; }
+        .layer-row label { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .arrow-btns span { cursor: pointer; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        .arrow-btns span:hover { background: var(--pu-yellow); }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; }
+        .modal-content { max-width: 90%; max-height: 85%; border: 4px solid white; border-radius: 8px; }
+        .close-btn { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<script src="data/dataWS1.js"></script><script src="data/dataWS2.js"></script>
+<script src="data/dataDAS1.js"></script><script src="data/dataDAS2.js"></script>
+
+<nav class="navbar">
+    <div class="navbar-brand">Sistem Informasi PPK PP BBWS Serayu Opak</div>
+    <div class="nav-menu">
+        <button class="nav-btn active" onclick="bukaHalaman('page-beranda', this)">Beranda</button>
+        <button class="nav-btn" onclick="bukaHalaman('page-dashboard', this)">Dashboard Peta</button>
+    </div>
+</nav>
+
+<div id="page-beranda" class="page-section active">
+    <div class="beranda-card">
+        <h1>Selamat Datang</h1>
+        <p>Sistem Informasi Inventarisasi Paket Pekerjaan PPK PP BBWS Serayu Opak.</p>
+        <button class="btn-mulai" onclick="document.querySelectorAll('.nav-btn')[1].click()">Buka Peta &raquo;</button>
+    </div>
+</div>
+
+<div id="page-dashboard" class="page-section">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <input type="text" id="searchInput" class="search-box" placeholder="🔍 Cari paket, lokasi, atau tahun..." onkeyup="filterMenu()">
+        </div>
+        <div class="menu-container" id="menu-container">
+            <div id="loading" style="text-align:center; margin-top:20px;">Memuat data...</div>
+        </div>
+    </div>
+    <div id="map"></div>
+</div>
+
+<div id="fotoModal" class="modal" onclick="tutupModal()">
+    <span class="close-btn">&times;</span>
+    <img class="modal-content" id="imgModal">
+    <div id="captionModal" style="color:white; text-align:center; margin-top:15px; font-size:18px;"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    let masterData = [];
+
+    // --- 1. SETUP PETA ---
+    const map = L.map('map', {zoomControl: false}).setView([-7.6, 109.8], 9);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri'
+    }).addTo(map);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    map.createPane('p_ws'); map.createPane('p_das'); map.createPane('p_pkt');
+    map.getPane('p_pkt').style.zIndex = 450;
+    map.getPane('p_das').style.zIndex = 440;
+    map.getPane('p_ws').style.zIndex = 430;
+
+    const sWS = { color: "#003366", weight: 3, opacity: 0.7, fillColor: "#003366", fillOpacity: 0.1 };
+    const sDAS = { color: "#d35400", weight: 2, dashArray: '5,5', fillOpacity: 0.05 };
+
+    const gWS = L.featureGroup([
+        L.geoJSON(typeof dataWS1!=='undefined'?dataWS1:null, {style:sWS, pane:'p_ws'}),
+        L.geoJSON(typeof dataWS2!=='undefined'?dataWS2:null, {style:sWS, pane:'p_ws'})
+    ]).addTo(map);
+
+    const gDAS = L.featureGroup([
+        L.geoJSON(typeof dataDAS1!=='undefined'?dataDAS1:null, {style:sDAS, pane:'p_das'}),
+        L.geoJSON(typeof dataDAS2!=='undefined'?dataDAS2:null, {style:sDAS, pane:'p_das'})
+    ]).addTo(map);
+
+    const gPKT = L.featureGroup().addTo(map);
+
+    // --- 2. LAYER CONTROL ---
+    const LControl = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: function() {
+            const div = L.DomUtil.create('div', 'custom-layer-box leaflet-bar leaflet-control');
+            L.DomEvent.disableClickPropagation(div);
+            div.innerHTML = `
+                <div class="layer-row" data-pane="p_pkt"><label><input type="checkbox" checked onchange="toggleL('p_pkt', this)"> Titik Paket</label><div class="arrow-btns"><span onclick="moveL(this,'up')">▲</span><span onclick="moveL(this,'down')">▼</span></div></div>
+                <div class="layer-row" data-pane="p_das"><label><input type="checkbox" checked onchange="toggleL('p_das', this)"> Batas DAS</label><div class="arrow-btns"><span onclick="moveL(this,'up')">▲</span><span onclick="moveL(this,'down')">▼</span></div></div>
+                <div class="layer-row" data-pane="p_ws"><label><input type="checkbox" checked onchange="toggleL('p_ws', this)"> Batas WS</label><div class="arrow-btns"><span onclick="moveL(this,'up')">▲</span><span onclick="moveL(this,'down')">▼</span></div></div>
+            `;
+            return div;
+        }
+    });
+    map.addControl(new LControl());
+
+    function toggleL(p, chk) { 
+        const layers = { p_pkt: gPKT, p_das: gDAS, p_ws: gWS };
+        chk.checked ? map.addLayer(layers[p]) : map.removeLayer(layers[p]);
+    }
+    function moveL(btn, dir) {
+        const row = btn.closest('.layer-row');
+        if (dir==='up' && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+        else if (dir==='down' && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+        const rows = document.querySelectorAll('.layer-row');
+        let z = 460; rows.forEach(r => { map.getPane(r.dataset.pane).style.zIndex = z; z--; });
+    }
+
+    // --- 3. BACA CSV & BUILD UI ---
+    Papa.parse('data/paket.csv', {
+        download: true, header: true, skipEmptyLines: true,
+        transformHeader: h => h.trim().toLowerCase(),
+        complete: res => {
+            document.getElementById('loading').style.display='none';
+            buildUI(res.data);
+        }
+    });
+
+    function buildUI(data) {
+        const container = document.getElementById('menu-container');
+        const perTahun = {};
+
+        data.forEach(item => {
+            const thn = item.tahun;
+            const judul = item.judul;
+            const lat = parseFloat(item.lat);
+            const lng = parseFloat(item.long || item.lng);
+
+            if (thn && judul && !isNaN(lat) && !isNaN(lng)) {
+                const tipe = item.tipe || "UMUM";
+                if (!perTahun[thn]) perTahun[thn] = {};
+                if (!perTahun[thn][tipe]) perTahun[thn][tipe] = [];
+
+                // Create Marker
+                const fotoPath = item.foto ? (item.foto.startsWith('foto/') ? item.foto : 'foto/' + item.foto) : '';
+                const imgTag = fotoPath ? `<img src="${fotoPath}" class="foto-popup" onclick="bukaModal('${fotoPath}','${judul}')" onerror="this.style.display='none'">` : '';
+                
+                const popupBody = `
+                    <div class="custom-popup">
+                        <h3>${judul}</h3>
+                        <div class="popup-info">
+                            <b>📍 Lokasi:</b> ${item.lokasi || '-'}<br>
+                            <b>📝 Deskripsi:</b> ${item.deskripsi || '-'}<br>
+                            <b>📦 Output:</b> ${item.output || '-'}<br>
+                            <b>🚀 Outcome:</b> ${item.outcome || '-'}
+                        </div>
+                        ${imgTag}
+                    </div>`;
+
+                const marker = L.marker([lat, lng], {pane: 'p_pkt'}).bindPopup(popupBody);
+                gPKT.addLayer(marker);
+
+                // Create Sidebar Item
+                const div = document.createElement('div');
+                div.className = 'item-paket';
+                div.innerHTML = `<b>${judul}</b>`;
+                div.onclick = () => { map.flyTo([lat, lng], 16); setTimeout(()=>marker.openPopup(), 1000); };
+
+                const searchKey = `${judul} ${item.lokasi} ${tipe} ${thn}`.toLowerCase();
+                masterData.push({ key: searchKey, marker, element: div });
+                perTahun[thn][tipe].push(div);
+            }
+        });
+
+        // Render Sidebar
+        Object.keys(perTahun).sort((a,b)=>b-a).forEach(thn => {
+            const btn = document.createElement('button');
+            btn.className = 'year-btn';
+            btn.innerText = `📁 Tahun ${thn}`;
+            const list = document.createElement('div');
+            list.className = 'package-list';
+            btn.onclick = () => list.style.display = list.style.display==='block'?'none':'block';
+
+            Object.keys(perTahun[thn]).sort().forEach(tipe => {
+                const head = document.createElement('div');
+                head.className = 'tipe-header';
+                head.innerText = tipe;
+                list.appendChild(head);
+                perTahun[thn][tipe].forEach(el => list.appendChild(el));
+            });
+            container.appendChild(btn); container.appendChild(list);
+        });
+    }
+
+    // --- 4. SEARCH & NAV ---
+    function filterMenu() {
+        const val = document.getElementById('searchInput').value.toLowerCase();
+        document.querySelectorAll('.package-list').forEach(l => l.style.display = val?'block':'none');
+        
+        masterData.forEach(d => {
+            const match = d.key.includes(val);
+            d.element.style.display = match ? 'block' : 'none';
+            match ? gPKT.addLayer(d.marker) : gPKT.removeLayer(d.marker);
+        });
+
+        document.querySelectorAll('.tipe-header').forEach(h => {
+            let next = h.nextElementSibling, visible = false;
+            while(next && next.classList.contains('item-paket')) {
+                if(next.style.display !== 'none') visible = true;
+                next = next.nextElementSibling;
+            }
+            h.style.display = visible ? 'block' : 'none';
+        });
+    }
+
+    function bukaHalaman(id, btn) {
+        document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        btn.classList.add('active');
+        if (id === 'page-dashboard') setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    function bukaModal(s, c) {
+        const m = document.getElementById('fotoModal');
+        document.getElementById('imgModal').src = s;
+        document.getElementById('captionModal').innerText = c;
+        m.style.display = 'flex';
+    }
+    function tutupModal() { document.getElementById('fotoModal').style.display = 'none'; }
+</script>
+</body>
+</html>
