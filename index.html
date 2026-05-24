@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistem Informasi Inventarisasi Paket Pekerjaan PPK PP BBWS Serayu Opak</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --pu-blue: #003366; --pu-yellow: #ffcc00; --bg-color: #f4f7f6; }
+        
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        .navbar { background-color: var(--pu-blue); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 2000; }
+        .navbar-brand { font-size: 16px; font-weight: bold; color: var(--pu-yellow); }
+        .nav-menu { display: flex; gap: 10px; }
+        .nav-btn { background: none; border: none; color: white; font-size: 13px; cursor: pointer; padding: 5px 10px; border-radius: 4px; transition: 0.3s; }
+        .nav-btn.active { background-color: rgba(255, 255, 255, 0.2); color: var(--pu-yellow); }
+
+        .page-section { display: none; flex-grow: 1; height: 100%; overflow: hidden; }
+        .page-section.active { display: flex; }
+
+        /* SIDEBAR */
+        .sidebar { width: 320px; background: white; height: 100%; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; transition: left 0.3s ease-in-out; }
+        .sidebar-header { padding: 10px; background: #003366; }
+        .search-box { width: 100%; padding: 8px; border: none; border-radius: 4px; font-size: 12px; }
+        .menu-container { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        
+        .periode-btn { background: #002244; color: #ffcc00; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .periode-list { display: none; padding-left: 8px; border-left: 1px dashed #ddd; margin-left: 8px; margin-bottom: 5px; }
+        .year-btn { background: var(--pu-blue); color: white; width: 100%; text-align: left; padding: 6px 10px; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; margin: 3px 0; cursor: pointer; }
+        .package-list { display: none; padding: 2px 8px 8px 8px; }
+        .tipe-header { font-size: 10px; color: #d35400; margin: 8px 0 3px 0; font-weight: bold; border-bottom: 1px solid #eee; text-transform: uppercase; }
+        .item-paket { background: #f9f9f9; border-left: 3px solid var(--pu-yellow); padding: 6px 8px; margin-bottom: 3px; border-radius: 3px; font-size: 10px; cursor: pointer; }
+        .item-paket.no-coord { border-left: 3px solid #e74c3c; }
+
+        /* MAP */
+        #map { flex-grow: 1; height: 100%; z-index: 1; }
+        .custom-layer-box { background: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.2); font-size: 10px; min-width: 120px; }
+        
+        /* MOBILE STYLES */
+        .open-sidebar-btn { display: none; }
+        @media (max-width: 768px) {
+            .sidebar { position: absolute; left: -100%; }
+            .sidebar.open { left: 0; }
+            .open-sidebar-btn { display: block; position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 1500; background: var(--pu-blue); color: var(--pu-yellow); border: 2px solid white; padding: 10px 20px; border-radius: 25px; font-size: 13px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        }
+    </style>
+</head>
+<body>
+
+<script src="data/dataWS1.js"></script><script src="data/dataWS2.js"></script>
+<script src="data/dataDAS1.js"></script><script src="data/dataDAS2.js"></script>
+
+<nav class="navbar">
+    <div class="navbar-brand">Sistem Inventarisasi BBWS Serayu Opak</div>
+    <div class="nav-menu">
+        <button class="nav-btn active" onclick="bukaHalaman('page-beranda', this)">Beranda</button>
+        <button class="nav-btn" onclick="bukaHalaman('page-dashboard', this)">Peta</button>
+    </div>
+</nav>
+
+<div id="page-beranda" class="page-section active">
+    <div style="background:white; padding:30px; border-radius:10px; text-align:center;">
+        <h1>Selamat Datang</h1>
+        <button onclick="document.querySelectorAll('.nav-btn')[1].click()" style="padding:10px 20px; cursor:pointer;">Buka Peta &raquo;</button>
+    </div>
+</div>
+
+<div id="page-dashboard" class="page-section">
+    <button class="open-sidebar-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰ Daftar Paket</button>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <input type="text" id="searchInput" class="search-box" placeholder="Cari paket..." onkeyup="filterMenu()">
+        </div>
+        <div class="menu-container" id="menu-container">
+            <div id="loading" style="text-align:center; font-size:12px;">Memuat data...</div>
+        </div>
+    </div>
+    <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map', {zoomControl: false}).setView([-7.6, 109.8], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '&copy; OpenStreetMap'}).addTo(map);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    let gPKT = L.featureGroup().addTo(map);
+
+    Papa.parse('data/paket.csv?t=' + new Date().getTime(), {
+        download: true, header: true, skipEmptyLines: true,
+        transformHeader: h => h.trim().toLowerCase(),
+        complete: res => {
+            document.getElementById('loading').style.display='none';
+            buildUI(res.data);
+        }
+    });
+
+    function getPeriode(y) {
+        y = parseInt(y);
+        if (y >= 2026) return "2026-2030";
+        if (y >= 2021) return "2021-2025";
+        if (y >= 2016) return "2016-2020";
+        if (y >= 2011) return "2011-2015";
+        if (y >= 2006) return "2006-2010";
+        if (y >= 2000) return "2000-2005";
+        return "Sebelum 2000";
+    }
+
+    function buildUI(data) {
+        const container = document.getElementById('menu-container');
+        const perPeriode = {};
+        data.forEach(item => {
+            const thn = item.tahun?.trim();
+            const judul = item.judul?.trim();
+            if (!thn || !judul) return;
+            
+            const pName = getPeriode(thn);
+            const tipe = item.tipe || "UMUM";
+            if (!perPeriode[pName]) perPeriode[pName] = {};
+            if (!perPeriode[pName][thn]) perPeriode[pName][thn] = {};
+            if (!perPeriode[pName][thn][tipe]) perPeriode[pName][thn][tipe] = [];
+
+            const lat = parseFloat(item.lat), lng = parseFloat(item.long || item.lng);
+            const hasC = !isNaN(lat) && !isNaN(lng);
+            let marker = null;
+            if (hasC) {
+                marker = L.marker([lat, lng]).bindPopup(`<h3>${judul}</h3>`);
+                gPKT.addLayer(marker);
+            }
+
+            const div = document.createElement('div');
+            div.className = hasC ? 'item-paket' : 'item-paket no-coord';
+            div.innerHTML = `<b>${judul}</b>`;
+            div.onclick = () => {
+                if (hasC) { 
+                    map.flyTo([lat, lng], 16); marker.openPopup();
+                    if (window.innerWidth <= 768) document.querySelector('.sidebar').classList.remove('open');
+                } else alert("Tidak ada koordinat.");
+            };
+            perPeriode[pName][thn][tipe].push(div);
+        });
+
+        Object.keys(perPeriode).sort().reverse().forEach(p => {
+            const btnP = document.createElement('button'); btnP.className = 'periode-btn';
+            btnP.innerHTML = `<span>🗂️ ${p}</span> <span>▼</span>`;
+            const listP = document.createElement('div'); listP.className = 'periode-list';
+            btnP.onclick = () => listP.style.display = listP.style.display === 'block' ? 'none' : 'block';
+            
+            Object.keys(perPeriode[p]).sort().reverse().forEach(t => {
+                const btnT = document.createElement('button'); btnT.className = 'year-btn'; btnT.innerText = `📁 ${t}`;
+                const listT = document.createElement('div'); listT.className = 'package-list';
+                btnT.onclick = () => listT.style.display = listT.style.display === 'block' ? 'none' : 'block';
+                Object.keys(perPeriode[p][t]).forEach(tipe => {
+                    const head = document.createElement('div'); head.className = 'tipe-header'; head.innerText = tipe;
+                    listT.appendChild(head);
+                    perPeriode[p][t][tipe].forEach(el => listT.appendChild(el));
+                });
+                listP.appendChild(btnT); listP.appendChild(listT);
+            });
+            container.appendChild(btnP); container.appendChild(listP);
+        });
+    }
+
+    function filterMenu() {
+        const val = document.getElementById('searchInput').value.toLowerCase();
+        document.querySelectorAll('.item-paket').forEach(el => {
+            el.style.display = el.innerText.toLowerCase().includes(val) ? 'block' : 'none';
+        });
+    }
+
+    function bukaHalaman(id, btn) {
+        document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        btn.classList.add('active');
+        if (id === 'page-dashboard') setTimeout(() => map.invalidateSize(), 200);
+    }
+</script>
+</body>
+</html>
