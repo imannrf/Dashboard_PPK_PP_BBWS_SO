@@ -45,8 +45,11 @@
         /* --- KARTU KONTEN BERANDA --- */
         .beranda-card { 
             position: relative; 
-            z-index: 2; /* Agar kartu berada di atas gambar slideshow */
-            background: rgba(255, 255, 255, 0.9); /* Transparansi putih 90% agar estetik */
+            z-index: 2; 
+            /* Tingkat transparansi 75% putih */
+            background: rgba(255, 255, 255, 0.75); 
+            /* Efek blur ringan ala kaca agar tulisan tetap kontras */
+            backdrop-filter: blur(4px); 
             padding: 40px; 
             border-radius: 10px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
@@ -67,23 +70,22 @@
         .slide-track {
             display: flex;
             width: 100%; height: 100%;
-            transition: transform 1.2s ease-in-out; /* Kecepatan efek geser transisi (1.2 detik) */
+            /* Efek transisi akan dikontrol via JavaScript */
         }
 
         .slide {
-            flex: 0 0 100%; /* Lebar tiap slide mengikuti lebar penuh layar */
+            flex: 0 0 100%; 
             width: 100%; height: 100%;
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
         }
 
-        /* Overlay lapisan warna gelap tipis supaya teks putih/konten tetap kontras & mudah dibaca */
         .slide-overlay {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(0, 51, 102, 0.25); /* Paduan warna Biru PU tipis */
+            background: rgba(0, 51, 102, 0.25); 
         }
 
         /* SIDEBAR & FOLDER BERTINGKAT */
@@ -166,6 +168,8 @@
             <div class="slide" style="background-image: url('data/landing 6.JPG');"></div>
             <div class="slide" style="background-image: url('data/landing 7.JPG');"></div>
             <div class="slide" style="background-image: url('data/landing 8.JPG');"></div>
+            
+            <div class="slide" style="background-image: url('data/landing 1.JPG');"></div>
         </div>
         <div class="slide-overlay"></div>
     </div>
@@ -420,18 +424,26 @@
 
     // --- 6. SCRIPT ANIMASI AUTOMATIC SLIDESHOW BERANDA ---
     let currentSlide = 0;
-    const totalSlides = 8; // Sesuai jumlah file landing 1 s.d 8
+    const totalSlides = 8; // Tetap 8 karena ini jumlah foto aslinya
     const slideTrack = document.getElementById('slideTrack');
 
-    // Interval diatur menggeser setiap 4000 milidetik (4 detik)
     setInterval(() => {
         currentSlide++;
-        if (currentSlide >= totalSlides) {
-            currentSlide = 0; // Kembali ke gambar pertama setelah melewati gambar ke-8
-        }
-        // Menggeser kontainer gambar menggunakan CSS transform secara dinamis
+        
+        // Nyalakan animasi geser (1.2 detik)
+        slideTrack.style.transition = 'transform 1.2s ease-in-out';
         slideTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
-    }, 4000);
+
+        // Jika slideshow sampai di "Foto Bayangan" (setelah foto ke-8)
+        if (currentSlide === totalSlides) {
+            setTimeout(() => {
+                // Matikan animasi sejenak untuk melompat kembali ke foto 1 asli tanpa terlihat
+                slideTrack.style.transition = 'none';
+                currentSlide = 0;
+                slideTrack.style.transform = `translateX(0%)`;
+            }, 1200); // 1200 milidetik menunggu efek geser selesai sebelum melompat diam-diam
+        }
+    }, 4000); // Geser setiap 4 detik
 </script>
 </body>
 </html>
