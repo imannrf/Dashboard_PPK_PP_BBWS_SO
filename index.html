@@ -31,9 +31,60 @@
         .page-section { display: none; flex-grow: 1; height: 100%; overflow: hidden; }
         .page-section.active { display: flex; }
 
-        #page-beranda { flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
-        .beranda-card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 800px; width: 90%; }
+        /* --- MENGATUR POSISI BERANDA & SLIDESHOW --- */
+        #page-beranda { 
+            position: relative; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            text-align: center; 
+            padding: 40px; 
+            overflow: hidden; 
+        }
+        
+        /* --- KARTU KONTEN BERANDA --- */
+        .beranda-card { 
+            position: relative; 
+            z-index: 2; /* Agar kartu berada di atas gambar slideshow */
+            background: rgba(255, 255, 255, 0.9); /* Transparansi putih 90% agar estetik */
+            padding: 40px; 
+            border-radius: 10px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+            max-width: 800px; 
+            width: 90%; 
+        }
+        
         .btn-mulai { background-color: var(--pu-yellow); color: var(--pu-blue); border: none; padding: 10px 20px; font-size: 15px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+
+        /* --- BACKGROUND SLIDESHOW --- */
+        .slideshow-bg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+
+        .slide-track {
+            display: flex;
+            width: 100%; height: 100%;
+            transition: transform 1.2s ease-in-out; /* Kecepatan efek geser transisi (1.2 detik) */
+        }
+
+        .slide {
+            flex: 0 0 100%; /* Lebar tiap slide mengikuti lebar penuh layar */
+            width: 100%; height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* Overlay lapisan warna gelap tipis supaya teks putih/konten tetap kontras & mudah dibaca */
+        .slide-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 51, 102, 0.25); /* Paduan warna Biru PU tipis */
+        }
 
         /* SIDEBAR & FOLDER BERTINGKAT */
         .sidebar { width: 340px; background: white; height: 100%; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; }
@@ -105,6 +156,20 @@
 </nav>
 
 <div id="page-beranda" class="page-section active">
+    <div class="slideshow-bg">
+        <div class="slide-track" id="slideTrack">
+            <div class="slide" style="background-image: url('data/landing 1.JPG');"></div>
+            <div class="slide" style="background-image: url('data/landing 2.JPG');"></div>
+            <div class="slide" style="background-image: url('data/landing 3.JPG');"></div>
+            <div class="slide" style="background-image: url('data/landing 4.JPG');"></div>
+            <div class="slide" style="background-image: url('data/landing 5.JPG');"></div>
+            <div class="slide" style="background-image: url('data/landing 6.JPG');"></div>
+            <div class="slide" style="background-image: url('data/landing 7.JPG');"></div>
+            <div class="slide" style="background-image: url('data/landing 8.JPG');"></div>
+        </div>
+        <div class="slide-overlay"></div>
+    </div>
+
     <div class="beranda-card">
         <h1>Selamat Datang</h1>
         <p>Sistem Informasi Inventarisasi Paket Pekerjaan PPK PP BBWS Serayu Opak.</p>
@@ -209,7 +274,7 @@
     // --- 4. BACA CSV & BUILD UI ---
     Papa.parse('data/paket.csv?t=' + new Date().getTime(), {
         download: true, header: true, skipEmptyLines: true,
-        transformHeader: h => h.trim().toLowerCase(), // header CSV jadi lowercase
+        transformHeader: h => h.trim().toLowerCase(), 
         complete: res => {
             document.getElementById('loading').style.display='none';
             buildUI(res.data);
@@ -221,11 +286,9 @@
         const perPeriode = {}; 
 
         data.forEach(item => {
-            // MENGAMBIL DATA UTAMA DARI CSV (Berdasarkan gambar Excel terbaru)
             const thn = item.tahun ? item.tahun.trim() : null;
             const judul = item['nama paket'] ? item['nama paket'].trim() : null;
             
-            // Menyesuaikan pembacaan header kolom koordinat menjadi 'latitude' dan 'longitude'
             const lat = parseFloat(item.latitude);
             const lng = parseFloat(item.longitude);
             const hasCoords = !isNaN(lat) && !isNaN(lng);
@@ -354,6 +417,21 @@
         btn.classList.add('active');
         if (id === 'page-dashboard') setTimeout(() => map.invalidateSize(), 200);
     }
+
+    // --- 6. SCRIPT ANIMASI AUTOMATIC SLIDESHOW BERANDA ---
+    let currentSlide = 0;
+    const totalSlides = 8; // Sesuai jumlah file landing 1 s.d 8
+    const slideTrack = document.getElementById('slideTrack');
+
+    // Interval diatur menggeser setiap 4000 milidetik (4 detik)
+    setInterval(() => {
+        currentSlide++;
+        if (currentSlide >= totalSlides) {
+            currentSlide = 0; // Kembali ke gambar pertama setelah melewati gambar ke-8
+        }
+        // Menggeser kontainer gambar menggunakan CSS transform secara dinamis
+        slideTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
+    }, 4000);
 </script>
 </body>
 </html>
