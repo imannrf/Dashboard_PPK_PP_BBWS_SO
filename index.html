@@ -7,6 +7,7 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
     
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -46,9 +47,7 @@
         .beranda-card { 
             position: relative; 
             z-index: 2; 
-            /* Tingkat transparansi 75% putih */
             background: rgba(255, 255, 255, 0.75); 
-            /* Efek blur ringan ala kaca agar tulisan tetap kontras */
             backdrop-filter: blur(4px); 
             padding: 40px; 
             border-radius: 10px; 
@@ -70,7 +69,6 @@
         .slide-track {
             display: flex;
             width: 100%; height: 100%;
-            /* Efek transisi akan dikontrol via JavaScript */
         }
 
         .slide {
@@ -192,6 +190,27 @@
             </div>
         </div>
         <div class="menu-container" id="menu-container">
+            
+            <div style="background: #fdfdfd; border: 1px solid #ddd; border-left: 4px solid var(--pu-blue); padding: 12px; margin-bottom: 15px; border-radius: 4px; font-size: 12px;">
+                <span style="font-weight: bold; color: var(--pu-blue); display: block; margin-bottom: 8px;">📍 CARI KOORDINAT LOKASI</span>
+                
+                <div style="margin-bottom: 8px;">
+                    <select id="coordType" style="width: 100%; padding: 6px; font-size: 11px; border-radius: 4px; border: 1px solid #ccc;" onchange="updatePlaceholders()">
+                        <option value="latlng">GCS WGS84 (Latitude, Longitude)</option>
+                        <option value="utm">UTM Zona 49S (Easting, Northing)</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                    <input type="text" id="coordInput1" class="search-box" placeholder="Latitude (Y) ex: -7.605" style="padding: 6px; font-size: 11px; border: 1px solid #ccc; margin: 0;">
+                    <input type="text" id="coordInput2" class="search-box" placeholder="Longitude (X) ex: 110.150" style="padding: 6px; font-size: 11px; border: 1px solid #ccc; margin: 0;">
+                </div>
+                
+                <button onclick="cariKoordinatLokasi()" style="width: 100%; background-color: var(--pu-blue); color: white; border: none; padding: 7px; font-size: 11px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.backgroundColor='#002244'" onmouseout="this.style.backgroundColor='#003366'">
+                    Plot & Buka Lokasi
+                </button>
+            </div>
+
             <div id="loading" style="text-align:center; margin-top:20px; font-size:13px;">Memuat data...</div>
         </div>
     </div>
@@ -424,26 +443,130 @@
 
     // --- 6. SCRIPT ANIMASI AUTOMATIC SLIDESHOW BERANDA ---
     let currentSlide = 0;
-    const totalSlides = 8; // Tetap 8 karena ini jumlah foto aslinya
+    const totalSlides = 8; 
     const slideTrack = document.getElementById('slideTrack');
 
     setInterval(() => {
         currentSlide++;
         
-        // Nyalakan animasi geser (1.2 detik)
         slideTrack.style.transition = 'transform 1.2s ease-in-out';
         slideTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
 
-        // Jika slideshow sampai di "Foto Bayangan" (setelah foto ke-8)
         if (currentSlide === totalSlides) {
             setTimeout(() => {
-                // Matikan animasi sejenak untuk melompat kembali ke foto 1 asli tanpa terlihat
                 slideTrack.style.transition = 'none';
                 currentSlide = 0;
                 slideTrack.style.transform = `translateX(0%)`;
-            }, 1200); // 1200 milidetik menunggu efek geser selesai sebelum melompat diam-diam
+            }, 1200); 
         }
-    }, 4000); // Geser setiap 4 detik
+    }, 4000); 
+
+    // --- 7. SCRIPT PENCARIAN KOORDINAT LOKASI ---
+    
+    // Definisi parameter proyeksi untuk Proj4
+    const prjWGS84 = "+proj=longlat +datum=WGS84 +no_defs";
+    const prjUTM49S = "+proj=utm +zone=49 +south +datum=WGS84 +units=m +no_defs";
+
+    // Variabel penanda pencarian koordinat
+    let markerPencarianKoordinat = null;
+
+    // Fungsi mengubah petunjuk input otomatis saat jenis koordinat diganti
+    function updatePlaceholders() {
+        const type = document.getElementById('coordType').value;
+        const inp1 = document.getElementById('coordInput1');
+        const inp2 = document.getElementById('coordInput2');
+        
+        if (type === 'latlng') {
+            inp1.placeholder = "Latitude (Y) ex: -7.605";
+            inp2.placeholder = "Longitude (X) ex: 110.150";
+        } else {
+            inp1.placeholder = "Easting (X) ex: 406250";
+            inp2.placeholder = "Northing (Y) ex: 9159250";
+        }
+        inp1.value = "";
+        inp2.value = "";
+    }
+
+    // Fungsi utama memproses pencarian lokasi
+    function cariKoordinatLokasi() {
+        const type = document.getElementById('coordType').value;
+        let val1 = document.getElementById('coordInput1').value.trim().replace(',', '.');
+        let val2 = document.getElementById('coordInput2').value.trim().replace(',', '.');
+        
+        let v1 = parseFloat(val1);
+        let v2 = parseFloat(val2);
+        
+        if (isNaN(v1) || isNaN(v2)) {
+            alert("Mohon masukkan format angka koordinat yang valid.");
+            return;
+        }
+        
+        let lat, lng;
+        
+        if (type === 'latlng') {
+            lat = v1;
+            lng = v2;
+        } else if (type === 'utm') {
+            try {
+                // Proj4 menerima parameter array [Easting, Northing] -> mengembalikan [Longitude, Latitude]
+                const hasilKonversi = proj4(prjUTM49S, prjWGS84, [v1, v2]);
+                lng = hasilKonversi[0];
+                lat = hasilKonversi[1];
+            } catch (err) {
+                alert("Gagal melakukan konversi UTM 49S. Periksa kembali nilai yang Anda input.");
+                return;
+            }
+        }
+        
+        // Validasi batas jangkauan wilayah pulau Jawa / Indonesia selatan
+        if (lat < -12 || lat > -5 || lng < 105 || lng > 116) {
+            const konfirmasi = confirm("Koordinat hasil plot berada di luar rentang operasional umum Jawa Bagian Tengah/Selatan. Tetap arahkan peta ke lokasi ini?");
+            if (!konfirmasi) return;
+        }
+        
+        // Arahkan peta ke titik koordinat baru
+        map.flyTo([lat, lng], 15);
+        
+        // Buat atau perbarui posisi penanda sementara di peta
+        const popupContent = `
+            <div class="custom-popup">
+                <h3 style="border-bottom: 2px solid #e74c3c;">📍 Hasil Plot Koordinat</h3>
+                <div class="popup-info">
+                    <b>Format Input:</b> ${type === 'latlng' ? 'Geografis WGS84' : 'UTM Zona 49S'}<br>
+                    <b>Lintang (Lat):</b> ${lat.toFixed(6)}<br>
+                    <b>Bujur (Lng):</b> ${lng.toFixed(6)}<br>
+                    <hr style="border:0; border-top:1px dashed #ccc; margin:5px 0;">
+                    <span style="font-size:10px; color:#555;">Titik ini merupakan penanda eksternal dari form pencarian lokasi.</span>
+                </div>
+            </div>
+        `;
+        
+        if (markerPencarianKoordinat) {
+            markerPencarianKoordinat.setLatLng([lat, lng]).setPopupContent(popupContent);
+        } else {
+            markerPencarianKoordinat = L.circleMarker([lat, lng], {
+                radius: 9,
+                fillColor: "#e74c3c", // Warna merah kontras
+                color: "#ffffff",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.9,
+                zIndexOffset: 1000
+            }).addTo(map);
+            
+            markerPencarianKoordinat.bindPopup(popupContent);
+        }
+        
+        // Buka popup penanda secara otomatis
+        setTimeout(() => {
+            markerPencarianKoordinat.openPopup();
+        }, 500);
+        
+        // Auto close sidebar jika dibuka via smartphone
+        if (window.innerWidth <= 768) {
+            toggleSidebar();
+        }
+    }
 </script>
 </body>
 </html>
